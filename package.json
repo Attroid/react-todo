@@ -1,0 +1,10 @@
+{
+  "name": "react_todo",
+  "version": "1.0.0",
+  "author": "Attroid",
+  "license": "MIT",
+  "scripts": {
+    "install-dependencies": "cd api && npm install && cd ../client && npm install"
+  },
+  "dependencies": {}
+}
