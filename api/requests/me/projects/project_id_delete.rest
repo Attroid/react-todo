@@ -1,2 +1,2 @@
-DELETE http://localhost:3001/me/projects/2
-X-CSRF-TOKEN: TuYhXuqO-LfqBc6lD-i_cOVXINcWO06esOQ4
+DELETE http://localhost:3001/me/projects/1
+X-CSRF-TOKEN: <csrf-token>

@@ -1,8 +1,8 @@
-PATCH http://localhost:3001/me/projects/3
-X-CSRF-TOKEN: TuYhXuqO-LfqBc6lD-i_cOVXINcWO06esOQ4
+PATCH http://localhost:3001/me/projects/1
+X-CSRF-TOKEN: <csrf-token>
 Content-Type: application/json
 
 {
-  "name": "MeKiwi",
-  "abbreviation": "MK"
+  "name": "Example 2",
+  "abbreviation": "EX2"
 }

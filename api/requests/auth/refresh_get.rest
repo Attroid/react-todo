@@ -1,2 +1,2 @@
 GET http://localhost:3001/auth/refresh
-X-CSRF-TOKEN: t05OjTj7-tJ2Z0sizgyXICT5N2LdWhZlWNl3
+X-CSRF-TOKEN: <csrf-token>

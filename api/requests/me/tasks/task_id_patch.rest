@@ -1,8 +1,7 @@
-PATCH http://localhost:3001/me/tasks/6
-X-CSRF-TOKEN: TuYhXuqO-LfqBc6lD-i_cOVXINcWO06esOQ4
+PATCH http://localhost:3001/me/tasks/1
+X-CSRF-TOKEN: <csrf-token>
 Content-Type: application/json
 
 {
-  "name": "MeKiwi",
-  "done": false
+  "name": "Clean your room"
 }

@@ -1,2 +1,2 @@
 POST http://localhost:3001/auth/logout
-X-CSRF-TOKEN: TuYhXuqO-LfqBc6lD-i_cOVXINcWO06esOQ4
+X-CSRF-TOKEN: <csrf-token>

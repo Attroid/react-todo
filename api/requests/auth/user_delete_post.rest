@@ -1,8 +1,8 @@
 POST http://localhost:3001/auth/user-delete
-X-CSRF-TOKEN: TuYhXuqO-LfqBc6lD-i_cOVXINcWO06esOQ4
+X-CSRF-TOKEN: <csrf-token>
 Content-Type: application/json
 
 {
-  "userDeleteToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0eXBlIjoidXNlckRlbGV0ZVRva2VuIiwidXNlcklkIjoyLCJpYXQiOjE2NTM3NzA5MjYsImV4cCI6MTY2OTMyMjkyNn0.Z_Sv-4E7-tX3tZlbRebHtoUB0Q66La9-pa1IBZjDa-k",
-  "password": "asia_kunnossa"
+  "userDeleteToken": "user_delete_token",
+  "password": "example"
 }
