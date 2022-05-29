@@ -1,0 +1,7 @@
+POST http://localhost:3001/me/tasks
+X-CSRF-TOKEN: TuYhXuqO-LfqBc6lD-i_cOVXINcWO06esOQ4
+Content-Type: application/json
+
+{
+  "projectId": 4
+}

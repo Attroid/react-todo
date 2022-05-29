@@ -1,0 +1,2 @@
+DELETE http://localhost:3001/me/projects/2
+X-CSRF-TOKEN: TuYhXuqO-LfqBc6lD-i_cOVXINcWO06esOQ4

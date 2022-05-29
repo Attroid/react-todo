@@ -1,0 +1,10 @@
+POST http://localhost:3001/auth/signup
+X-CSRF-TOKEN: TuYhXuqO-LfqBc6lD-i_cOVXINcWO06esOQ4
+Content-Type: application/json
+
+{
+  "username": "atte",
+  "email": "testi@localhosti1234d956",
+  "password": "asiaasdfsadffdsaa",
+  "passwordHash": "hahaa"
+}

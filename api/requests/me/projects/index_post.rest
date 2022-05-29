@@ -1,0 +1,8 @@
+POST http://localhost:3001/me/projects
+X-CSRF-TOKEN: TuYhXuqO-LfqBc6lD-i_cOVXINcWO06esOQ4
+Content-Type: application/json
+
+{
+  "name": "Mekiwi",
+  "abbreviation": "MKK"
+}

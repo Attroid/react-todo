@@ -1,0 +1,10 @@
+PATCH http://localhost:3001/me/data
+X-CSRF-TOKEN: TuYhXuqO-LfqBc6lD-i_cOVXINcWO06esOQ4
+Content-Type: application/json
+
+{
+  "username": "uus",
+  "customization": {
+    "theme": "acedia"
+  }
+}

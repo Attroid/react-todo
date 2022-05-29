@@ -1,0 +1,8 @@
+POST http://localhost:3001/auth/login
+X-CSRF-TOKEN: TuYhXuqO-LfqBc6lD-i_cOVXINcWO06esOQ4
+Content-Type: application/json
+
+{
+  "email": "test@localhost",
+  "password": "asia_kunnossa"
+}
