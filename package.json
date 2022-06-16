@@ -4,7 +4,8 @@
   "author": "Attroid",
   "license": "MIT",
   "scripts": {
-    "install-dependencies": "cd api && npm install && cd ../client && npm install"
+    "install-dependencies": "cd api && npm install && cd ../client && npm install",
+    "build:ui": "cd client && npm run build"
   },
   "dependencies": {}
 }

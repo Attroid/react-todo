@@ -1,105 +1,171 @@
-import { makeAutoObservable, flow, set } from 'mobx';
-import toast from 'react-hot-toast';
+import { makeAutoObservable, flow } from 'mobx';
+import api from './api';
+
+const isString = (variable) => {
+  return typeof variable === 'string' || variable instanceof String;
+};
 
 class ProjectsStore {
   stores = null;
-  projects = {};
-  isSavingTask = false;
-  isSavingProject = false;
+  allProjects = [];
+
+  // loading states
+  projectsFetched = false;
+  creatingTask = false;
+  creatingProject = false;
+  deletingProject = false;
+  patchingProject = false;
 
   constructor({ stores }) {
     this.stores = stores;
     makeAutoObservable(this);
   }
 
-  syncWithServer = flow(function* syncWithServer() {
+  fetchProjects = flow(function* () {
     try {
-      const response = yield this.stores.apis.projects.loadAll();
+      const { data } = yield api.get('/me/projects');
+      this.allProjects = data;
+      this.projectsFetched = true;
+    } catch (err) {
+      this.stores.toaster.error(err);
+    }
+  });
 
-      const projects = response.data.reduce(
-        (acc, project) => ({
-          ...acc,
-          [project.id]: project,
-        }),
-        {}
+  projectPost = flow(function* (params, { redirectUrl }) {
+    this.creatingProject = true;
+
+    try {
+      const { data } = yield api.post('/me/projects', params);
+      yield this.fetchProjects();
+      this.creatingProject = false;
+
+      if (isString(redirectUrl)) {
+        this.stores.view.navigate(`${redirectUrl}/${data.id}`);
+      }
+    } catch (err) {
+      this.stores.toaster.error(err);
+    }
+
+    this.creatingProject = false;
+  });
+
+  projectDelete = flow(function* (projectId, { redirectUrl }) {
+    this.deletingProject = true;
+
+    try {
+      yield api.delete(`/me/projects/${projectId}`);
+      this.allProjects = this.allProjects.filter(
+        (project) => project.id !== Number(projectId)
       );
 
-      this.projects = projects;
-    } catch (error) {
-      console.error(error);
+      if (isString(redirectUrl)) {
+        this.stores.view.navigate(redirectUrl);
+      }
+    } catch (err) {
+      this.stores.toaster.error(err);
     }
+
+    this.deletingProject = false;
   });
 
-  createProject = flow(function* createProject(values) {
-    this.isSavingProject = true;
-    try {
-      yield this.stores.apis.projects.post(values);
-      this.syncWithServer();
-      toast.success('Created new project');
-    } catch (error) {
-      console.log(error);
-    }
-    this.isSavingProject = false;
-  });
+  projectPatch = flow(function* (projectId, params, { redirectUrl }) {
+    this.patchingProject = true;
 
-  updateProject = flow(function* updateProjec(projectId, values) {
-    this.isSavingProject = true;
     try {
-      yield this.stores.apis.projects.patch(projectId, values);
-      this.syncWithServer();
-      toast.success('Updated project');
-    } catch (error) {
-      console.log(error);
-    }
-    this.isSavingProject = false;
-  });
+      yield api.patch(`/me/projects/${projectId}`, params);
 
-  deleteProject = flow(function* deleteProject(projectId) {
-    this.isSavingProject = true;
-    try {
-      yield this.stores.apis.projects.delete(projectId);
-      this.syncWithServer();
-      toast.success('Deleted project');
-    } catch (error) {
-      console.log(error);
-    }
-    this.isSavingProject = false;
-  });
-
-  updateTask = flow(function* updateTask(taskId, values) {
-    this.isSavingTask = true;
-    try {
-      const response = yield this.stores.apis.task.patch(taskId, values);
-      const projectId = response.data.projectId;
-      const task = this.projects[projectId].tasks.find(
-        (task) => Number(task.id) === Number(taskId)
+      this.allProjects = this.allProjects.map((project) =>
+        project.id === Number(projectId) ? { ...project, ...params } : project
       );
-      set(task, values);
-    } catch (error) {
-      console.log(error);
+
+      if (isString(redirectUrl)) {
+        this.stores.view.navigate(redirectUrl);
+      }
+    } catch (err) {
+      this.stores.toaster.error(err);
     }
-    this.isSavingTask = false;
+
+    this.patchingProject = false;
   });
 
-  createTask = flow(function* createTask({ name, projectId }) {
-    this.isSavingTask = true;
+  taskPost = flow(function* (params) {
+    this.creatingTask = true;
+
     try {
-      yield this.stores.apis.task.post({ name, projectId });
-      yield this.syncWithServer();
-      toast.success('Created new task');
-    } catch (error) {
-      console.log(error);
+      const { data } = yield api.post('/me/tasks', { ...params });
+      this.allProjects = this.allProjects.map((project) => ({
+        ...project,
+        tasks:
+          project.id === params.projectId
+            ? project.tasks.concat(data)
+            : project.tasks,
+      }));
+    } catch (err) {
+      this.stores.toaster.error(err);
     }
-    this.isSavingTask = false;
+
+    this.creatingTask = false;
   });
 
-  deleteTask = flow(function* deleteTask(taskId) {
+  taskDelete = flow(function* (taskId) {
     try {
-      yield this.stores.apis.task.delete(taskId);
-      yield this.syncWithServer();
-      toast.success('Deleted task');
-    } catch (error) {
-      console.log(error);
+      yield api.delete(`/me/tasks/${taskId}`);
+
+      this.allProjects = this.allProjects.map((project) => ({
+        ...project,
+        tasks: project.tasks.filter((task) => task.id !== taskId),
+      }));
+    } catch (err) {
+      this.stores.toaster.error(err);
+    }
+  });
+
+  taskOptimisticDelete = flow(function* (taskId) {
+    const stateClone = JSON.parse(JSON.stringify(this.allProjects));
+
+    try {
+      this.allProjects = this.allProjects.map((project) => ({
+        ...project,
+        tasks: project.tasks.filter((task) => task.id !== taskId),
+      }));
+
+      yield api.delete(`/me/tasks/${taskId}`);
+    } catch (err) {
+      this.allProjects = stateClone;
+      this.stores.toaster.error(err);
+    }
+  });
+
+  taskPatch = flow(function* (taskId, params) {
+    try {
+      yield api.patch(`/me/tasks/${taskId}`, params);
+
+      this.allProjects = this.allProjects.map((project) => ({
+        ...project,
+        tasks: project.tasks.map((task) =>
+          task.id === taskId ? { ...task, ...params } : task
+        ),
+      }));
+    } catch (err) {
+      this.stores.toaster.error(err);
+    }
+  });
+
+  taskOptimisticPatch = flow(function* (taskId, params) {
+    const stateClone = JSON.parse(JSON.stringify(this.allProjects));
+
+    try {
+      this.allProjects = this.allProjects.map((project) => ({
+        ...project,
+        tasks: project.tasks.map((task) =>
+          task.id === taskId ? { ...task, ...params } : task
+        ),
+      }));
+
+      yield api.patch(`/me/tasks/${taskId}`, params);
+    } catch (err) {
+      this.allProjects = stateClone;
+      this.stores.toaster.error(err);
     }
   });
 }

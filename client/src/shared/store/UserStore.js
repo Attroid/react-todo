@@ -1,324 +1,151 @@
-import { Button } from 'react-bootstrap';
-import { makeAutoObservable, flow, when } from 'mobx';
-import { setCsrfTokenHeader } from './api/api';
-import toast from 'react-hot-toast';
-import js from 'shared/utils/javascript';
+import { makeAutoObservable, flow } from 'mobx';
+import { LoginStatus } from 'shared/constants/auth';
+import api from './api';
 
-const supportedThemes = [
-  'cerulean',
-  'cosmo',
-  'sandstone',
-  'simplex',
-  'spacelab',
-  'united',
-  'yeti',
-  'zephyr',
-];
-const defaultTheme = 'cerulean';
+const isString = (variable) => {
+  return typeof variable === 'string' || variable instanceof String;
+};
+
+const getInitialUserData = () => ({
+  customization: {
+    theme: null,
+  },
+  username: null,
+  email: null,
+});
 
 class UserStore {
   stores = null;
-  displayName = null;
-  email = null;
-  csrfInHeader = false;
-  theme = null;
-  supportedThemes = supportedThemes;
-  defaultTheme = defaultTheme;
-  refreshing = false;
-  loadedTheme = null;
-  isAuthPending = false;
+  csrfToken = null;
+  userLoading = false;
+  user = getInitialUserData();
 
   constructor({ stores }) {
-    this.stores = stores;
     makeAutoObservable(this);
-    this.loadCsrfToken();
-    this.refresh();
-  }
 
-  get loginStatus() {
-    if (this.isAuthPending === true) {
-      return 'pending';
-    } else if (this.email === null) {
-      return 'anonymous';
-    } else {
-      return 'authenticated';
-    }
-  }
+    this.stores = stores;
 
-  get currentTheme() {
-    return this.theme || this.defaultTheme;
-  }
-
-  loadTheme() {
-    if (this.loadedTheme) return;
-
-    const themeToLoad = this.supportedThemes.includes(this.currentTheme)
-      ? this.currentTheme
-      : this.defaultTheme;
-
-    import(`bootswatch/dist/${themeToLoad}/bootstrap.min.css`);
-    this.loadedTheme = themeToLoad;
-  }
-
-  showLoadYourCustomThemeToast() {
-    if (this.loadedTheme === this.currentTheme) return;
-
-    toast(
-      () => (
-        <Button onClick={js.refreshPage}>
-          Click to load your custom theme
-        </Button>
-      ),
-      { duration: 10000 }
-    );
-  }
-
-  setLoggedUser(user) {
-    this.displayName = user.username;
-    this.email = user.email;
-    this.theme = user.customization.theme;
-  }
-
-  clearLoggedUser() {
-    this.displayName = null;
-    this.email = null;
-    this.theme = null;
-  }
-
-  loadCsrfToken = flow(function* loadCsrfToken() {
-    try {
-      const response = yield this.stores.apis.auth.loadCsrfToken();
-
-      setCsrfTokenHeader(response.data.csrfToken);
-      this.csrfInHeader = true;
-    } catch (error) {
-      toast.error('Network error');
-      console.log(error);
-    }
-  });
-
-  login = flow(function* login({ email, password }) {
-    yield when(() => this.loginStatus !== 'pending');
-
-    if (this.loginStatus === 'authenticated') {
-      this.stores.view.navigate('/');
-      return;
-    }
-
-    try {
-      this.isAuthPending = true;
-      const loginPromise = this.stores.apis.auth.login({ email, password });
-
-      toast.promise(loginPromise, {
-        loading: 'Logging in...',
-        success: <b>Logged in succesfully</b>,
-        error: (error) => {
-          if (error?.response?.status === 401) {
-            return <b>Wrong credentials</b>;
-          } else {
-            return <b>Error occured, try again later</b>;
-          }
-        },
+    (async () => {
+      await this.fetchCsrfToken();
+      this.refresh({
+        redirectUrl: window.location.pathname.startsWith('/auth')
+          ? '/project'
+          : undefined,
+        failureRedirectUrl: window.location.pathname.startsWith('/auth')
+          ? undefined
+          : '/auth/login',
       });
+    })();
+  }
 
-      const response = yield loginPromise;
-      this.setLoggedUser(response.data);
-      this.showLoadYourCustomThemeToast();
-      this.stores.projects.syncWithServer();
-      this.stores.view.navigate('/');
-    } catch (error) {
-      console.error(error);
+  fetchCsrfToken = flow(function* () {
+    try {
+      const { data } = yield api.get('/auth/csrf-token');
+      this.csrfToken = data.csrfToken;
+    } catch (err) {
+      this.stores.toaster.error(err);
     }
-
-    this.isAuthPending = false;
   });
 
-  register = flow(function* register({ username, email, password }) {
-    yield when(() => this.loginStatus !== 'pending');
-
-    if (this.loginStatus === 'authenticated') {
-      this.stores.view.navigate('/');
-      return;
-    }
+  login = flow(function* ({ email, password }, { redirectUrl }) {
+    this.userLoading = true;
 
     try {
-      this.isAuthPending = true;
-      const registerPromise = this.stores.apis.auth.register({
-        username,
+      const { data } = yield api.post('/auth/login', {
         email,
         password,
       });
 
-      toast.promise(registerPromise, {
-        loading: 'Registering...',
-        success: <b>Registered user succesfully</b>,
-        error: (error) => {
-          if (error?.response?.status === 400) {
-            return <b>Bad request</b>;
-          } else {
-            return <b>Error occured, try again later</b>;
-          }
-        },
-      });
+      this.user = data;
+      yield this.stores.projects.fetchProjects();
 
-      const response = yield registerPromise;
-
-      this.setLoggedUser(response.data);
-      this.stores.projects.syncWithServer();
-      this.stores.view.navigate('/');
-    } catch (error) {
-      console.error(error);
+      if (isString(redirectUrl)) {
+        this.stores.view.navigate(redirectUrl);
+      }
+    } catch (err) {
+      this.stores.toaster.error(err);
     }
 
-    this.isAuthPending = false;
+    this.userLoading = false;
   });
 
-  refresh = flow(function* refresh() {
-    this.refreshing = true;
-    yield when(() => this.csrfInHeader);
+  signup = flow(function* ({ email, username, password }, { redirectUrl }) {
+    this.userLoading = true;
 
     try {
-      this.isAuthPending = true;
-      const refreshPromise = this.stores.apis.auth.refresh();
+      const { data } = yield api.post('/auth/signup', {
+        email,
+        username,
+        password,
+      });
 
-      const response = yield refreshPromise;
+      this.user = data;
+      yield this.stores.projects.fetchProjects();
 
-      toast.success(`Logged in as ${response.data.displayName}`);
-      this.setLoggedUser(response.data);
-      this.stores.projects.syncWithServer();
-    } catch (error) {
-      if (error?.response?.status !== 401) {
-        console.error(error);
+      if (isString(redirectUrl)) {
+        this.stores.view.navigate(redirectUrl);
+      }
+    } catch (err) {
+      this.stores.toaster.error(err);
+    }
+
+    this.userLoading = false;
+  });
+
+  refresh = flow(function* ({
+    toastsEnabled = false,
+    failureRedirectUrl,
+    redirectUrl,
+  }) {
+    this.userLoading = true;
+
+    try {
+      const { data } = yield api.get('/auth/refresh');
+
+      this.user = data;
+      yield this.stores.projects.fetchProjects();
+
+      if (isString(redirectUrl)) {
+        this.stores.view.navigate(redirectUrl);
+      }
+    } catch (err) {
+      if (toastsEnabled) {
+        this.stores.toaster.error(err);
+      }
+
+      if (isString(failureRedirectUrl)) {
+        this.stores.view.navigate(failureRedirectUrl);
       }
     }
 
-    this.isAuthPending = false;
-    this.refreshing = false;
-    this.loadTheme();
+    this.userLoading = false;
   });
 
-  logout = flow(function* logout() {
-    yield when(() => this.loginStatus !== 'pending');
-
+  logout = flow(function* ({ redirectUrl }) {
     try {
-      this.isAuthPending = true;
-      const logoutPromise = this.stores.apis.auth.logout();
-
-      toast.promise(logoutPromise, {
-        loading: 'Logging out...',
-        success: <b>Logged out succesfully</b>,
-        error: <b>Failed to logout</b>,
-      });
-
-      yield logoutPromise;
-
-      this.clearLoggedUser();
-      this.showLoadYourCustomThemeToast();
-    } catch (error) {
-      console.error(error);
+      yield api.post('/auth/logout');
+    } catch (err) {
+      this.stores.toaster.error(err);
     }
 
-    this.isAuthPending = false;
-  });
+    this.user = getInitialUserData();
 
-  requestPasswordReset = flow(function* requestPasswordReset() {
-    try {
-      const requestPasswordResetPromise =
-        this.stores.apis.auth.requestPasswordReset(this.email);
-
-      toast.promise(requestPasswordResetPromise, {
-        loading: 'Requesting password reset...',
-        success: <b>Sent reset email succesfully</b>,
-        error: <b>Failed to send email</b>,
-      });
-    } catch (error) {
-      console.error(error);
+    if (isString(redirectUrl)) {
+      this.stores.view.navigate(redirectUrl);
     }
   });
 
-  updatePassword = flow(function* updatePassword({
-    passwordResetToken,
-    password,
-  }) {
-    try {
-      const passwordUpdatePromise = this.stores.apis.auth.updatePassword(
-        passwordResetToken,
-        password
-      );
-
-      toast.promise(passwordUpdatePromise, {
-        loading: 'Updating password...',
-        success: <b>Updated password succesfully</b>,
-        error: <b>Could not update password</b>,
-      });
-    } catch (error) {
-      console.error(error);
+  get loginStatus() {
+    if (this.userLoading) {
+      return LoginStatus.PENDING;
     }
-  });
 
-  requestDeleteAccount = flow(function* requestDeleteAccount() {
-    try {
-      const requestDeleteAccount = this.stores.apis.auth.requestDeleteAccount(
-        this.email
-      );
-
-      toast.promise(requestDeleteAccount, {
-        loading: 'Requesting account delete...',
-        success: <b>Sent delete account email succesfully</b>,
-        error: <b>Failed to send email</b>,
-      });
-    } catch (error) {
-      console.error(error);
+    if (this.user.email === null) {
+      return LoginStatus.ANONYMOUS;
     }
-  });
 
-  deleteAccount = flow(function* deleteAccount({ userDeleteToken, password }) {
-    try {
-      const deleteAccountPromise = this.stores.apis.auth.deleteAccount(
-        userDeleteToken,
-        password
-      );
-
-      toast.promise(deleteAccountPromise, {
-        loading: 'Deleting account...',
-        success: <b>Deleted account succesfully</b>,
-        error: <b>Could not delete account</b>,
-      });
-    } catch (error) {
-      console.error(error);
-    }
-  });
-
-  updateDisplayName = flow(function* updateDisplayName({ displayName }) {
-    try {
-      const updateDisplayNamePromise =
-        this.stores.apis.auth.updateDisplayName(displayName);
-
-      toast.promise(updateDisplayNamePromise, {
-        loading: 'Updating display name...',
-        success: <b>Updated display name succesfully</b>,
-        error: <b>Failed to update display name</b>,
-      });
-
-      yield updateDisplayNamePromise;
-
-      this.displayName = displayName;
-      return { status: 'success', data: {} };
-    } catch (error) {
-      console.error(error);
-      return { status: 'error', error };
-    }
-  });
-
-  updateTheme = flow(function* updateTheme({ theme }) {
-    try {
-      yield this.stores.apis.auth.updateTheme(theme);
-      js.refreshPage();
-    } catch (error) {
-      console.log(error);
-      toast.error('Internal server error');
-    }
-  });
+    return LoginStatus.AUTHENTICATED;
+  }
 }
 
 export default UserStore;

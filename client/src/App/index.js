@@ -1,20 +1,19 @@
-import { Toaster } from 'react-hot-toast';
-import Routes from './Routes';
-import { BrowserRouter } from 'react-router-dom';
+import './bootstrapCustomization.scss';
 import { StoreProvider } from 'shared/store';
-import GlobalStyle from 'shared/components/GlobalStyle';
-import ErrorBoundary from 'shared/components/ErrorBoundary';
+import Toaster from './Toaster';
+import Layout from './Layout';
+import AppRoutes from './Routes';
+import { BrowserRouter } from 'react-router-dom';
 
 const App = () => (
-  <ErrorBoundary>
-    <BrowserRouter>
-      <GlobalStyle />
-      <StoreProvider>
-        <Routes />
-      </StoreProvider>
-      <Toaster position='bottom-right' />
-    </BrowserRouter>
-  </ErrorBoundary>
+  <BrowserRouter>
+    <StoreProvider>
+      <Layout>
+        <AppRoutes />
+      </Layout>
+      <Toaster position='bottom-end' />
+    </StoreProvider>
+  </BrowserRouter>
 );
 
 export default App;
